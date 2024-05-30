@@ -7,7 +7,7 @@ class Composer(BaseModel):
     
 class Piece(BaseModel):
     name: str
-    alt_name: str
+    alt_name: None | str = None
     difficulty: int
     composer_id: int
     
