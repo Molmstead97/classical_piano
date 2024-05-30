@@ -1,6 +1,5 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from schemas import Composer, Piece
-from typing import Optional
 
 import json
 
@@ -27,14 +26,16 @@ async def get_composers() -> list[Composer]:
     
     return composer_list
 
+
 @app.get('/pieces')
-async def get_pieces(composer_id: Optional[int] = Query(None)):
+async def get_pieces(composer_id: None | int = None):
     
     if composer_id is not None:
         return [piece for piece in pieces_list if piece['composer_id'] == composer_id]
             
     return pieces_list
     
+
 @app.post('/composers')
 async def create_composer(composer: Composer):
     
@@ -44,6 +45,7 @@ async def create_composer(composer: Composer):
     
     composer_list.append(composer)
     return 'Composer created successfully'
+
 
 @app.post('/pieces')
 async def create_piece(piece: Piece):
@@ -59,32 +61,38 @@ async def create_piece(piece: Piece):
     
 
 @app.put('/composers/{composer_id}')
-async def update_composer(composer_id: int, composer: Composer):
+async def update_composer(composer_id: int, updated_composer: Composer):
     
-    for id, composer in enumerate(composer_list):
+    for composer in composer_list:
         if composer['composer_id'] == composer_id:
-            composer_list[id] = composer
+            if any(composer['composer_id'] == updated_composer.composer_id and composer['composer_id'] != composer_id for composer in composer_list):
+                raise HTTPException(status_code=400, detail="Composer ID already exists")
+
+            composer.update(updated_composer) 
             return composer
     
-    if any(composer['composer_id'] == composer.composer_id for composer in composer_list):
-        raise HTTPException(status_code=400, detail="Composer ID already exists")
-    
-    composer_list.append(composer)
-    return composer
+    new_composer = updated_composer.model_dump()
+    composer_list.append(new_composer)
+    return new_composer
+
 
 @app.put('/pieces/{piece_name}')
-async def update_piece(piece_name: str, piece: Piece):
+async def update_piece(piece_name: str, updated_piece: Piece):
     
-    for name, piece in enumerate(pieces_list):
+    if updated_piece.difficulty < 1 or updated_piece.difficulty > 10:
+        return 'Difficulty not valid. Input a number between 1-10'
+    
+    if not any(composer['composer_id'] == updated_piece.composer_id for composer in composer_list):
+                raise HTTPException(status_code=400, detail='Composer ID not found')
+    
+    for piece in pieces_list:
         if piece['name'] == piece_name:
-            pieces_list[name] = piece
+            piece.update(updated_piece)
             return piece
     
-    if any(piece['name'] == piece.name for piece in pieces_list):
-        raise HTTPException(status_code=400, detail="piece ID already exists")
-    
-    pieces_list.append(piece)
-    return piece
+    new_piece = updated_piece.model_dump()
+    pieces_list.append(new_piece)
+    return new_piece
     
 
 @app.delete('/composers/{composer_id}')
@@ -96,6 +104,7 @@ async def delete_composer(composer_id: int):
             return 'Deleted successfully'
     
     raise HTTPException(status_code=404, detail='Composer not found')
+
 
 @app.delete('/pieces/{piece_name}')
 async def delete_piece(piece_name: str):
